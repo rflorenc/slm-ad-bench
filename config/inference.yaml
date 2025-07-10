@@ -1,0 +1,60 @@
+# Inference backend configurations
+
+inference:
+  default_backend: "local_transformers"
+  fallback_backends: []  # None by default
+  timeout_seconds: 3600
+  retry_attempts: 1
+  
+  # Backend-specific configurations
+  backend_configs:
+    local_transformers:
+      device: "cuda"
+      dtype: "float16"
+      use_4bit: true
+      use_nested_quant: true
+      use_cpu_offload: false
+      torch_dtype: "float16"
+      low_cpu_mem_usage: true
+      offload_folder: "offload_folder"
+      
+    vllm:
+      tensor_parallel_size: 1
+      gpu_memory_utilization: 0.9
+      max_model_len: 4096
+      trust_remote_code: false
+      server_url: null  # Use local engine by default
+      dtype: "float16"
+      
+    triton:
+      server_url: "localhost:8000"
+      model_version: "1"
+      protocol: "http"
+      timeout: 60
+
+# Per env overrides
+environments:
+  development:
+    inference:
+      backend_configs:
+        local_transformers:
+          use_4bit: false  # Disable quantization (debugging)
+          use_cpu_offload: true
+        vllm:
+          gpu_memory_utilization: 0.7
+          
+  production:
+    inference:
+      fallback_backends: ["local_transformers"]  # Enable fallback in prod
+      backend_configs:
+        vllm:
+          gpu_memory_utilization: 0.95  # prod
+          tensor_parallel_size: 2  # Multi-GPU in production
+          
+  testing:
+    inference:
+      timeout_seconds: 300
+      backend_configs:
+        local_transformers:
+          use_cpu_offload: true
+          use_4bit: false

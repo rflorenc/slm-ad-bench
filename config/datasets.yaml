@@ -1,0 +1,68 @@
+datasets:
+  # Labeled datasets (supervised)
+  - name: "unsw-nb15-labeled"
+    dataset_type: "unsw-nb15"
+    train_path: "datasets/intermediate_tasks/intrusion_detection/UNSW_NB15/UNSW_NB15_training-set.csv"
+    test_path: "datasets/intermediate_tasks/intrusion_detection/UNSW_NB15/UNSW_NB15_testing-set.csv"
+    nlines: 2000
+    preprocessing:
+      normalize: true
+      remove_duplicates: false  # do NOT remove duplicates
+      handle_missing: true      # fill NaNs
+      encode_categorical: true  # code encode proto, service, state
+      
+  - name: "hdfs-eventtraces-labeled"
+    dataset_type: "eventtraces"
+    data_path: "datasets/intermediate_tasks/task1_systems/loghub/HDFS/HDFS_v1_labelled/preprocessed/Event_traces.csv"
+    nlines: 1000
+    preprocessing:
+      remove_empty_tokens: true
+      skip_missing_labels: true
+      parse_features: true
+      enable_semantic_enrichment: true
+      template_path: "datasets/intermediate_tasks/task1_systems/loghub/HDFS/HDFS_v1_labelled/preprocessed/HDFS.log_templates.csv"
+      
+  # Unlabeled datasets unsupervised
+  - name: "unsw-nb15-unlabeled"
+    dataset_type: "unsw-nb15"
+    data_path: "datasets/intermediate_tasks/intrusion_detection/UNSW_NB15/UNSW-NB15_1.csv"
+    nlines: 2000
+    contamination: 0.1
+    preprocessing:
+      normalize: true
+      remove_duplicates: false
+      handle_missing: true
+      encode_categorical: true
+      
+  - name: "hdfs-unlabeled"
+    dataset_type: "eventtraces"
+    data_path: "datasets/intermediate_tasks/task1_systems/loghub/HDFS/HDFS_2k.log_structured.csv"
+    nlines: 2000
+    contamination: 0.05
+    preprocessing:
+      remove_empty_tokens: true
+      skip_missing_labels: true
+      parse_features: true
+
+benchmark_scenarios:
+  - name: "quick_test"
+    description: "Quick test with small datasets"
+    models: ["Granite_3.2-2b-instruct"]
+    datasets: ["unsw-nb15-labeled"]
+    nlines_override: 100
+    
+  - name: "full_supervised"
+    description: "Full supervised evaluation"
+    models: ["DeepSeek-R1-Distill-Qwen-1.5B", "Granite_3.2-2b-instruct", "Llama-3.2-3B-Instruct"]
+    datasets: ["unsw-nb15-labeled", "hdfs-eventtraces-labeled"]
+    
+  - name: "unsupervised_only"
+    description: "Unsupervised anomaly detection"
+    models: ["DeepSeek-R1-Distill-Qwen-1.5B", "Granite_3.3-2b-instruct"]
+    datasets: ["unsw-nb15-unlabeled", "hdfs-unlabeled"]
+    
+  - name: "performance_test"
+    description: "Performance and energy efficiency test"
+    models: ["DeepSeek-R1-Distill-Qwen-1.5B", "Granite_3.2-2b-instruct", "Mistral-7B-Instruct-v0.3"]
+    datasets: ["unsw-nb15-labeled"]
+    nlines_override: 5000

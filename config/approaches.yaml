@@ -1,0 +1,90 @@
+# Edit to control which approaches to run
+
+# Globals
+reasoning_enhancements:
+  self_consistency:
+    enabled: true
+    num_samples: 3
+    temperature: 0.7
+    
+  verifier_feedback:
+    enabled: true
+    use_same_model: true
+    verifier_temperature: 0.3
+    
+  sampling:
+    anomaly_percentage: 0.1  # Analyze % of detected anomalies
+    min_samples: 3           # Always analyze at least 3
+    max_samples: 8          # Cap to control processing time
+    normal_samples: 2        # Include 2 normal samples for comparison
+
+approaches:
+  # Small models (1.5B-3B parameters)
+  - name: "Granite_3.2-2b-instruct"
+    type: "llm"
+    model_name: "ibm-granite/granite-3.2-2b-instruct"
+    enabled: true
+    
+  - name: "Llama-3.2-3B-Instruct"
+    type: "llm"
+    model_name: "meta-llama/Llama-3.2-3B-Instruct"
+    enabled: true
+    
+  - name: "DeepSeek-R1-Distill-Qwen-1.5B"
+    type: "llm"
+    model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+    enabled: true
+    
+  # Large models (7B-8B parameters)
+  - name: "DeepSeek-R1-Distill-Qwen-7B"
+    type: "llm"
+    model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+    enabled: true
+    
+  - name: "Mistral-7B-Instruct-v0.3"
+    type: "llm"
+    model_name: "mistralai/Mistral-7B-Instruct-v0.3"
+    enabled: true
+    
+  - name: "Granite_3.2_8B-instruct"
+    type: "llm"
+    model_name: "ibm-granite/granite-3.2-8b-instruct"
+    enabled: true
+    
+  - name: "Llama-3.1-8B-Instruct"
+    type: "llm"
+    model_name: "meta-llama/Llama-3.1-8B-Instruct"
+    enabled: true
+    
+  - name: "DeepSeek-R1-Distill-Llama-8B"
+    type: "llm"
+    model_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+    enabled: true
+
+
+test_configs:
+  test:
+    - "Granite_3.2-2b-instruct"
+    - "DeepSeek-R1-Distill-Qwen-1.5B"
+  
+  small_models:
+    - "Granite_3.2-2b-instruct"
+    - "Llama-3.2-3B-Instruct"
+    - "DeepSeek-R1-Distill-Qwen-1.5B"
+  
+  large_models:
+    - "DeepSeek-R1-Distill-Qwen-7B"
+    - "Mistral-7B-Instruct-v0.3"
+    - "Granite_3.2_8B-instruct"
+    - "Llama-3.1-8B-Instruct"
+    - "DeepSeek-R1-Distill-Llama-8B"
+
+  all_models:
+      - "DeepSeek-R1-Distill-Qwen-1.5B"
+      - "Granite_3.2-2b-instruct"
+      - "Llama-3.2-3B-Instruct"
+      - "DeepSeek-R1-Distill-Qwen-7B"
+      - "Mistral-7B-Instruct-v0.3"
+      - "Granite_3.2_8B-instruct"
+      - "Llama-3.1-8B-Instruct"
+      - "DeepSeek-R1-Distill-Llama-8B"

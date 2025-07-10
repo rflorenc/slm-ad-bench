@@ -1,0 +1,37 @@
+torch
+transformers>=4.45.2
+datasets
+bitsandbytes
+peft
+trl
+accelerate
+grpcio>=1.71.0
+langchain_milvus
+langchain_community
+langchain_huggingface
+ipywidgets
+scikit-learn
+mistral-inference
+
+pandas
+numpy
+seaborn
+plotly
+tqdm
+
+# clustering
+dbscan
+hdbscan
+
+# system monitoring
+psutil
+py-cpuinfo
+
+
+GPUtil
+nvidia-ml-py
+
+# power estimation
+powerapi
+
+#faiss-gpu-cu12 # CUDA 12.x, Python 3.8+

@@ -1,0 +1,127 @@
+# Model configurations
+
+models:
+  # 2B Models
+  - name: "Granite_3.2-2b-instruct"
+    model_name: "ibm-granite/granite-3.2-2b-instruct"
+    supported_backends: ["local_transformers"]
+    preferred_backend: "local_transformers"
+    backend_configs:
+      local_transformers:
+        batch_size: 8
+        max_length: 128
+        use_4bit: true
+        use_nested_quant: true
+        use_cpu_offload: false
+        device: "cuda"
+        torch_dtype: "float16"
+
+  # 3B Models
+  - name: "Llama-3.2-3B-Instruct"
+    model_name: "meta-llama/Llama-3.2-3B-Instruct"
+    supported_backends: ["local_transformers"]
+    preferred_backend: "local_transformers"
+    backend_configs:
+      local_transformers:
+        batch_size: 2
+        max_length: 128
+        use_4bit: true
+        use_nested_quant: true
+        use_cpu_offload: false
+        device: "cuda"
+        torch_dtype: "float16"
+
+  # 1.5B Models
+  - name: "DeepSeek-R1-Distill-Qwen-1.5B"
+    model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+    supported_backends: ["local_transformers"]
+    preferred_backend: "local_transformers"
+    backend_configs:
+      local_transformers:
+        batch_size: 8
+        max_length: 128
+        use_4bit: true
+        use_nested_quant: true
+        use_cpu_offload: false
+        device: "cuda"
+        torch_dtype: "float16"
+
+  # 7B Models
+  - name: "DeepSeek-R1-Distill-Qwen-7B"
+    model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+    supported_backends: ["local_transformers"]
+    preferred_backend: "local_transformers"
+    backend_configs:
+      local_transformers:
+        batch_size: 1
+        max_length: 128
+        use_4bit: true
+        use_nested_quant: true
+        use_cpu_offload: true
+        device: "cuda"
+        torch_dtype: "float16"
+        low_cpu_mem_usage: true
+
+  - name: "Mistral-7B-Instruct-v0.3"
+    model_name: "mistralai/Mistral-7B-Instruct-v0.3"
+    supported_backends: ["local_transformers"]
+    preferred_backend: "local_transformers"
+    backend_configs:
+      local_transformers:
+        batch_size: 1
+        max_length: 128
+        use_4bit: true
+        use_nested_quant: true
+        use_cpu_offload: true
+        device: "cuda"
+        torch_dtype: "float16"
+        low_cpu_mem_usage: true
+
+  # 8B Models
+  - name: "Granite_3.2_8B-instruct"
+    model_name: "ibm-granite/granite-3.2-8b-instruct"
+    supported_backends: ["local_transformers"]
+    preferred_backend: "local_transformers"
+    backend_configs:
+      local_transformers:
+        batch_size: 1
+        max_length: 128
+        use_4bit: true
+        use_nested_quant: true
+        use_cpu_offload: true
+        device: "cuda"
+        torch_dtype: "float16"
+        low_cpu_mem_usage: true
+        offload_folder: "offload_8b_granite"
+
+  - name: "Llama-3.1-8B-Instruct"
+    model_name: "meta-llama/Llama-3.1-8B-Instruct"
+    supported_backends: ["local_transformers"]
+    preferred_backend: "local_transformers"
+    backend_configs:
+      local_transformers:
+        batch_size: 1
+        max_length: 128
+        use_4bit: true
+        use_nested_quant: true
+        use_cpu_offload: true
+        device: "cuda"
+        torch_dtype: "float16"
+        low_cpu_mem_usage: true
+        offload_folder: "offload_8b_llama"
+
+  - name: "DeepSeek-R1-Distill-Llama-8B"
+    model_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+    supported_backends: ["local_transformers"]
+    preferred_backend: "local_transformers"
+    backend_configs:
+      local_transformers:
+        batch_size: 1
+        max_length: 128
+        use_4bit: true
+        use_nested_quant: true
+        use_cpu_offload: true
+        device: "cuda"
+        torch_dtype: "float16"
+        low_cpu_mem_usage: true
+        offload_folder: "offload_8b_deepseek"
