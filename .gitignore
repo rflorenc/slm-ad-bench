@@ -1,8 +1,13 @@
 bench_logs
 output_results
+benchmarks/output_results
+venv*
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 hf_token.txt
+generate_report_pdf.py
+analyze_benchmark.py
 
+datasets/

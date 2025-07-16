@@ -1,5 +1,5 @@
 """
-Evaluation module for SLM-AD-BENCH refactored
+Evaluation module for SLM-AD-BENCH
 """
 
 from .data_loading import (

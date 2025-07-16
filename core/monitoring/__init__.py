@@ -1,5 +1,5 @@
 """
-Monitoring and visualization module for SLM-AD-BENCH refactored
+Monitoring and visualization module for SLM-AD-BENCH
 """
 
 from .system_monitor import SystemMonitor, monitoring_context

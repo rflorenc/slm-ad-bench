@@ -10,6 +10,14 @@ from .local_transformers import LocalTransformersBackend, LocalTransformersConfi
 
 logger = logging.getLogger(__name__)
 
+# Import vLLM backend with graceful fallback
+try:
+    from .vllm import VLLMBackend, VLLMConfig
+    VLLM_AVAILABLE = True
+except ImportError:
+    VLLM_AVAILABLE = False
+    logger.warning("vLLM backend not available. Install with: pip install vllm>=0.6.0")
+
 class InferenceBackendFactory:
 
     _backends: Dict[str, Type[InferenceBackend]] = {
@@ -19,6 +27,11 @@ class InferenceBackendFactory:
     _configs: Dict[str, Type[InferenceConfig]] = {
         "local_transformers": LocalTransformersConfig,
     }
+    
+    # Register vLLM backend if available
+    if VLLM_AVAILABLE:
+        _backends["vllm"] = VLLMBackend
+        _configs["vllm"] = VLLMConfig
     
     @classmethod
     def create_backend(cls, backend_type: str, config: Union[Dict, InferenceConfig]) -> InferenceBackend:

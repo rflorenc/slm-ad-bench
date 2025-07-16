@@ -6,8 +6,12 @@ import numpy as np
 import pandas as pd
 import logging
 import time
+import warnings
 from typing import Dict, Any, List, Tuple, Optional
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, cross_validate
+
+# Suppress sklearn warnings about precision/recall for imbalanced classes
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn.metrics._classification')
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -40,11 +44,25 @@ def evaluate_classifiers_cv(embeddings: np.ndarray, labels: np.ndarray,
     """
     logger.info(f"Evaluating classifiers with {folds}-fold CV on {len(embeddings)} samples")
     
-    # Define classifiers (matching original settings)
+    # Define classifiers with class weight balancing
     classifiers = {
-        'LogReg': LogisticRegression(random_state=42, max_iter=2000, C=1.0),
-        'DecisionTree': DecisionTreeClassifier(random_state=42, max_depth=10),
-        'RandomForest': RandomForestClassifier(random_state=42, n_estimators=100)
+        'LogReg': LogisticRegression(
+            random_state=42, 
+            max_iter=2000, 
+            C=1.0,
+            class_weight='balanced',  # Handle class imbalance
+            solver='lbfgs'  # Good for small datasets
+        ),
+        'DecisionTree': DecisionTreeClassifier(
+            random_state=42, 
+            max_depth=10,
+            class_weight='balanced'  # Handle class imbalance
+        ),
+        'RandomForest': RandomForestClassifier(
+            random_state=42, 
+            n_estimators=100,
+            class_weight='balanced'  # Handle class imbalance
+        )
     }
     
     # Metrics to compute

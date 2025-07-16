@@ -12,11 +12,12 @@ from typing import List, Dict, Any
 
 import torch
 
-refactored_dir = Path(__file__).parent
-sys.path.insert(0, str(refactored_dir))
+project_dir = Path(__file__).parent
+sys.path.insert(0, str(project_dir))
 
 from core.inference import InferenceManager
 from core.inference.local_transformers import LocalTransformersConfig
+from core.inference.factory import InferenceBackendFactory
 from core.evaluation import EvaluationEngine
 from utils.file_utils import init_run_dir, write_run_info, combine_results
 from utils.json_utils import safe_json_dump, ensure_json_serializable
@@ -37,7 +38,9 @@ logger = logging.getLogger(__name__)
 
 def setup_hf_token():
     """Load and set Hugging Face token from file"""
-    token_file = Path("hf_token.txt")
+    # Look for token file relative to script location
+    script_dir = Path(__file__).parent
+    token_file = script_dir / "hf_token.txt"
     if token_file.exists():
         try:
             with open(token_file) as f:
@@ -50,7 +53,7 @@ def setup_hf_token():
         except Exception as e:
             logger.error(f"Error loading HF token: {e}")
     else:
-        logger.warning("HF token file 'hf_token.txt' not found")
+        logger.warning(f"HF token file not found at: {token_file}")
 
 def load_model_configs() -> Dict[str, ModelConfig]:
     """Load model configurations from YAML"""
@@ -104,8 +107,8 @@ def load_approaches(test_config: str = None) -> tuple[List[Dict[str, str]], Dict
 APPROACHES = []
 REASONING_CONFIG = {}
 
-async def run_single_approach_refactored(approach_idx: int, data_args: List[str], nlines: int, dataset_type: str, 
-                                       contamination: str = "auto", mode: str = "labeled") -> bool:
+async def run_single_approach(approach_idx: int, data_args: List[str], nlines: int, dataset_type: str, 
+                            contamination: str = "auto", mode: str = "labeled", global_backend: str = None) -> bool:
     """
     Run a single approach using backend
     
@@ -127,17 +130,47 @@ async def run_single_approach_refactored(approach_idx: int, data_args: List[str]
             return False
         
         model_config = model_configs[approach["name"]]
-        backend_config = model_config.get_backend_config("local_transformers")
         
-        inference_config = LocalTransformersConfig(
-            model_name=approach["model_name"],
-            **backend_config
-        )
+        # Determine backend to use (global override > approach config > default)
+        if global_backend:
+            backend_name = global_backend
+            logger.info(f"[{approach['name']}] Using global backend override: {backend_name}")
+        else:
+            backend_name = approach.get("backend", "local_transformers")
+            logger.info(f"[{approach['name']}] Using configured backend: {backend_name}")
+        
+        # Get backend-specific configuration
+        backend_config = model_config.get_backend_config(backend_name)
+        
+        # Create appropriate config object
+        if backend_name == "local_transformers":
+            inference_config = LocalTransformersConfig(
+                model_name=approach["model_name"],
+                **backend_config
+            )
+        else:
+            # Use factory to create config for other backends
+            try:
+                backend_info = InferenceBackendFactory.get_backend_info(backend_name)
+                config_class = backend_info["config_class"]
+                inference_config = config_class(
+                    model_name=approach["model_name"],
+                    **backend_config
+                )
+            except ValueError as e:
+                logger.error(f"Backend '{backend_name}' not available: {e}")
+                logger.info(f"Falling back to local_transformers for {approach['name']}")
+                backend_name = "local_transformers"
+                backend_config = model_config.get_backend_config("local_transformers")
+                inference_config = LocalTransformersConfig(
+                    model_name=approach["model_name"],
+                    **backend_config
+                )
         
         manager = InferenceManager()
         evaluation_engine = EvaluationEngine(REASONING_CONFIG)
         
-        async with manager.backend_context("local_transformers", inference_config) as backend:
+        async with manager.backend_context(backend_name, inference_config) as backend:
             if mode == "unlabeled":
                 results = await evaluation_engine.run_unlabeled_evaluation(
                     backend, data_args[0], nlines, dataset_type, contamination, approach['name'], RESULTS_DIR
@@ -163,18 +196,16 @@ async def run_single_approach_refactored(approach_idx: int, data_args: List[str]
         logger.error(f"[{approach['name']}] Failed: {e}")
         return False
 
-# Placeholder functions removed - now using EvaluationEngine
-
 async def main():
-    """Main function - maintains original CLI interface"""
     setup_hf_token()
-    
-    if len(sys.argv) < 2:
+
+    if len(sys.argv) < 2 or (len(sys.argv) == 2 and sys.argv[1] in ["--help", "-h"]):
         logger.info("Usage:")
-        logger.info("  labeled, UNSW (train + test): python run_benchmark.py train.csv test.csv n unsw-nb15")
-        logger.info("  labeled, single file: python run_benchmark.py data.csv n [dataset_type]")
-        logger.info("  unlabeled: python run_benchmark.py data n dataset_type unlabeled [contamination]")
-        logger.info("  test configurations: python run_benchmark.py --test-config quick_test data n dataset_type unlabeled [contamination]")
+        logger.info("  labeled, UNSW (train + test): python run_benchmark.py [--backend BACKEND] train.csv test.csv n unsw-nb15")
+        logger.info("  labeled, single file: python run_benchmark.py [--backend BACKEND] data.csv n [dataset_type]")
+        logger.info("  unlabeled: python run_benchmark.py [--backend BACKEND] data n dataset_type unlabeled [contamination]")
+        logger.info("  test configurations: python run_benchmark.py --test-config quick_test [--backend BACKEND] data n dataset_type unlabeled [contamination]")
+        logger.info("  Available backends: local_transformers, vllm")
         return
 
     mode = "labeled"
@@ -183,17 +214,43 @@ async def main():
     data_args = []
     test_config = None
     
+    # Global backend override applied to all models
+    global_backend = None
+    
     args = sys.argv[1:]
     if len(args) > 0 and args[0] == "--test-config":
+        if len(args) < 2:
+            logger.error("--test-config requires a configuration name")
+            return
         test_config = args[1]
         args = args[2:]  # Remove --test-config and config name
         logger.info(f"Using test configuration: {test_config}")
     elif len(args) > 0 and args[0] == "--test-configs":
+        if len(args) < 2:
+            logger.error("--test-configs requires a configuration name")
+            return
         test_config = args[1]
-        args = args[2:]  # Remove --test-configs and config name (support both spellings)
+        args = args[2:]  # Remove --test-configs and config name
         logger.info(f"Using test configuration: {test_config}")
-    
-    # Parse arguments (same logic as original but using args list)
+
+    if len(args) > 0 and args[0] == "--backend":
+        if len(args) < 2:
+            logger.error("--backend requires a backend name")
+            return
+        global_backend = args[1]
+        args = args[2:]  # Remove --backend and backend name
+        logger.info(f"Global backend override: {global_backend}")
+
+        available_backends = InferenceBackendFactory.list_backends()
+        if global_backend not in available_backends:
+            logger.error(f"Backend '{global_backend}' not available. Available: {available_backends}")
+            return
+
+    if len(args) < 2:
+        logger.error("Insufficient arguments after parsing flags")
+        logger.info("Use --help for usage information")
+        return
+
     if len(args) >= 4 and args[3] == "unlabeled":
         mode = "unlabeled"
         data_path = os.path.abspath(args[0])
@@ -254,8 +311,8 @@ async def main():
     for idx in range(len(APPROACHES)):
         logger.info(f"\n=== Running approach {idx+1}/{len(APPROACHES)}: {APPROACHES[idx]['name']} ===")
         
-        success = await run_single_approach_refactored(
-            idx, data_args, nlines, dataset_type, contamination, mode
+        success = await run_single_approach(
+            idx, data_args, nlines, dataset_type, contamination, mode, global_backend
         )
         
         if success:
@@ -263,10 +320,10 @@ async def main():
         else:
             logger.warning(f"Approach {idx} failed; continuing...")
         
-        # Enhanced delay between approaches for GPU memory cleanup
+        # long wait for GPU mem cleanup
         await asyncio.sleep(5)
         
-            if torch.cuda.is_available():
+        if torch.cuda.is_available():
             allocated = torch.cuda.memory_allocated() / (1024**3)
             if allocated > 1.0:  # More than 1GB still allocated
                 logger.warning(f"High GPU memory usage before next model: {allocated:.2f} GB")

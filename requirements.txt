@@ -1,37 +1,59 @@
-torch
+# Core ML dependencies
+torch>=2.1.0
 transformers>=4.45.2
+vllm>=0.9.2
 datasets
 bitsandbytes
 peft
 trl
 accelerate
+
+# Data processing
+pandas
+numpy
+scikit-learn
+pyyaml
+
+# Visualization
+seaborn
+plotly
+matplotlib>=3.5.0
+tqdm
+
+# Clustering
+dbscan
+hdbscan
+
+# System monitoring
+psutil
+py-cpuinfo
+GPUtil
+nvidia-ml-py
+
+# Power estimation
+powerapi
+
+# LangChain
 grpcio>=1.71.0
 langchain_milvus
 langchain_community
 langchain_huggingface
+
+# Other
 ipywidgets
-scikit-learn
 mistral-inference
 
-pandas
-numpy
-seaborn
-plotly
-tqdm
+# Testing dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.10.0
+pytest-timeout>=2.1.0
 
-# clustering
-dbscan
-hdbscan
-
-# system monitoring
-psutil
-py-cpuinfo
-
-
-GPUtil
-nvidia-ml-py
-
-# power estimation
-powerapi
+# Code quality
+coverage>=6.0
+pytest-cov>=4.0
+black>=22.0
+isort>=5.0
+flake8>=4.0
 
 #faiss-gpu-cu12 # CUDA 12.x, Python 3.8+

@@ -1,5 +1,5 @@
 """
-Evaluation Engine for SLM-AD-BENCH refactored
+Evaluation Engine for SLM-AD-BENCH
 Main evaluation orchestrator that integrates all evaluation types
 """
 
@@ -250,37 +250,42 @@ class EvaluationEngine:
                 results.append(sanitized_result)
 
             logger.info("Starting RAG evaluation with training data only")
-            rag_system = RAGEvaluationSystem()
             
-            try:
-                # RAG for TRAIN data
-                rag_success = rag_system.setup_rag_database(
-                    train_lines, backend.model, backend.tokenizer, 
-                    reducer=pca if train_embeddings.shape[1] > 768 else None, embedding_type="llm"
-                )
+            # Skip RAG for vLLM backend to avoid memory issues
+            if backend.backend_name == "vllm":
+                logger.warning("Skipping RAG evaluation for vLLM backend due to memory constraints")
+            else:
+                rag_system = RAGEvaluationSystem()
                 
-                if rag_success:
-                    # Run RAG on a subset of test data
-                    test_subset = test_lines[:2]
-                    test_indices = list(range(len(test_subset)))
+                try:
+                    # RAG for TRAIN data
+                    rag_success = rag_system.setup_rag_database(
+                        train_lines, backend.model, backend.tokenizer, 
+                        reducer=pca if train_embeddings.shape[1] > 768 else None, embedding_type="llm"
+                    )
                     
-                    with monitor_operation("rag_explanation", Path(results_dir) / "monitoring" / approach_name) as rag_monitor:
-                        rag_results = rag_system.evaluate_with_rag(
-                            test_subset, test_indices, backend.model, backend.tokenizer,
-                            labels=y_train, dataset_type="unsw-nb15", results_dir=results_dir
-                        )
+                    if rag_success:
+                        # Run RAG on a subset of test data
+                        test_subset = test_lines[:2]
+                        test_indices = list(range(len(test_subset)))
+                        
+                        with monitor_operation("rag_explanation", Path(results_dir) / "monitoring" / approach_name) as rag_monitor:
+                            rag_results = rag_system.evaluate_with_rag(
+                                test_subset, test_indices, backend.model, backend.tokenizer,
+                                labels=y_train, dataset_type="unsw-nb15", results_dir=results_dir
+                            )
 
-                        rag_system.save_rag_results(rag_results, approach_name, results_dir)
+                            rag_system.save_rag_results(rag_results, approach_name, results_dir)
+                            
+                            rag_summary = rag_monitor._calculate_summary_stats(rag_monitor.metrics_history, "rag_explanation") if rag_monitor.metrics_history else {}
+                            
+                    else:
+                        logger.warning("RAG database setup failed, skipping RAG evaluation")
                         
-                        rag_summary = rag_monitor._calculate_summary_stats(rag_monitor.metrics_history, "rag_explanation") if rag_monitor.metrics_history else {}
-                        
-                else:
-                    logger.warning("RAG database setup failed, skipping RAG evaluation")
-                    
-            except Exception as e:
-                logger.error(f"RAG evaluation failed: {e}")
-            finally:
-                rag_system.cleanup()
+                except Exception as e:
+                    logger.error(f"RAG evaluation failed: {e}")
+                finally:
+                    rag_system.cleanup()
                 
             # Enhanced reasoning
             if self.reasoning_enhancer:
@@ -446,34 +451,39 @@ class EvaluationEngine:
 
 
             logger.info("Starting RAG evaluation with training data only")
-            rag_system = RAGEvaluationSystem()
             
-            try:
-                rag_success = rag_system.setup_rag_database(
-                    train_lines, backend.model, backend.tokenizer, 
-                    reducer=pca if train_embeddings.shape[1] > 768 else None, embedding_type="llm"
-                )
+            # Skip RAG for vLLM backend to avoid memory issues
+            if backend.backend_name == "vllm":
+                logger.warning("Skipping RAG evaluation for vLLM backend due to memory constraints")
+            else:
+                rag_system = RAGEvaluationSystem()
                 
-                if rag_success:
-                    test_subset = test_lines[:2]
-                    test_indices = list(range(len(test_subset)))
+                try:
+                    rag_success = rag_system.setup_rag_database(
+                        train_lines, backend.model, backend.tokenizer, 
+                        reducer=pca if train_embeddings.shape[1] > 768 else None, embedding_type="llm"
+                    )
                     
-                    with monitor_operation("rag_explanation", Path(results_dir) / "monitoring" / approach_name) as rag_monitor:
-                        rag_results = rag_system.evaluate_with_rag(
-                            test_subset, test_indices, backend.model, backend.tokenizer,
-                            labels=y_train, dataset_type=dataset_type, results_dir=results_dir
-                        )
+                    if rag_success:
+                        test_subset = test_lines[:2]
+                        test_indices = list(range(len(test_subset)))
                         
-                        rag_system.save_rag_results(rag_results, approach_name, results_dir)
-                        rag_summary = rag_monitor._calculate_summary_stats(rag_monitor.metrics_history, "rag_explanation") if rag_monitor.metrics_history else {}
+                        with monitor_operation("rag_explanation", Path(results_dir) / "monitoring" / approach_name) as rag_monitor:
+                            rag_results = rag_system.evaluate_with_rag(
+                                test_subset, test_indices, backend.model, backend.tokenizer,
+                                labels=y_train, dataset_type=dataset_type, results_dir=results_dir
+                            )
+                            
+                            rag_system.save_rag_results(rag_results, approach_name, results_dir)
+                            rag_summary = rag_monitor._calculate_summary_stats(rag_monitor.metrics_history, "rag_explanation") if rag_monitor.metrics_history else {}
+                            
+                    else:
+                        logger.warning("RAG database setup failed, skipping RAG evaluation")
                         
-                else:
-                    logger.warning("RAG database setup failed, skipping RAG evaluation")
-                    
-            except Exception as e:
-                logger.error(f"RAG evaluation failed: {e}")
-            finally:
-                rag_system.cleanup()
+                except Exception as e:
+                    logger.error(f"RAG evaluation failed: {e}")
+                finally:
+                    rag_system.cleanup()
                 
             # Enhanced Reasoning 
             if self.reasoning_enhancer:

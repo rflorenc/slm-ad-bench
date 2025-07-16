@@ -34,6 +34,15 @@ class RealTimeEmbeddingFunction:
         self.reducer = reducer
         self.embedding_type = embedding_type
         self.dim = None
+        
+    def __call__(self, texts):
+        """Make the embedding function callable for Milvus"""
+        if isinstance(texts, str):
+            # Single query
+            return self.embed_query(texts)
+        else:
+            # Multiple documents
+            return self.embed_documents(texts)
     
     def embed_documents(self, documents):
         """Create embeddings for a list of documents."""
@@ -58,29 +67,76 @@ class RealTimeEmbeddingFunction:
         import torch
         
         embeddings = []
-        self.model.eval()
         
-        for doc in documents:
-            with torch.no_grad():
-                inputs = self.tokenizer(
-                    doc, return_tensors="pt", truncation=True, 
-                    max_length=128, padding=True
-                ).to(self.model.device)
+        # Check if this is a vLLM embedding model
+        is_vllm = hasattr(self.model, '__class__') and 'LLM' in str(self.model.__class__)
+        
+        if is_vllm:
+            # For vLLM backend, use the encode method
+            try:
+                from vllm import PoolingParams
+                pooling_params = PoolingParams()
                 
-                outputs = self.model(**inputs, output_hidden_states=True)
-                last_hidden = outputs.hidden_states[-1]
-                doc_emb = last_hidden.mean(dim=1).cpu().numpy()[0]
+                # Process all documents at once
+                outputs = self.model.encode(documents, pooling_params=pooling_params, use_tqdm=False)
                 
-                # Apply dimensionality reduction if available
-                if self.reducer is not None:
-                    doc_emb = self.reducer.transform(doc_emb.reshape(1, -1))[0]
-                
-                embeddings.append(doc_emb.tolist())
-                
-                # Cleanup
-                del inputs, outputs, last_hidden
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                for output in outputs:
+                    if hasattr(output, 'outputs') and hasattr(output.outputs, 'data'):
+                        embedding_data = output.outputs.data
+                        if hasattr(embedding_data, 'cpu'):
+                            embedding_data = embedding_data.cpu().numpy()
+                        elif isinstance(embedding_data, np.ndarray):
+                            pass
+                        else:
+                            embedding_data = np.array(embedding_data)
+                        
+                        if embedding_data.ndim > 1:
+                            embedding_data = embedding_data.squeeze()
+                        
+                        embeddings.append(embedding_data.tolist())
+                    else:
+                        logger.error("Failed to extract vLLM embedding")
+                        dim = 768
+                        embeddings.append([0.0] * dim)
+                        
+            except Exception as e:
+                logger.error(f"vLLM embedding failed: {e}")
+                # Fallback
+                dim = 768
+                for doc in documents:
+                    embeddings.append([0.0] * dim)
+        else:
+            # Regular PyTorch model
+            if hasattr(self.model, 'eval'):
+                self.model.eval()
+            
+            for doc in documents:
+                try:
+                    with torch.no_grad():
+                        inputs = self.tokenizer(
+                            doc, return_tensors="pt", truncation=True, 
+                            max_length=128, padding=True
+                        ).to(self.model.device)
+                        
+                        outputs = self.model(**inputs, output_hidden_states=True)
+                        last_hidden = outputs.hidden_states[-1]
+                        doc_emb = last_hidden.mean(dim=1).cpu().numpy()[0]
+                        
+                        # Apply dimensionality reduction if available
+                        if self.reducer is not None:
+                            doc_emb = self.reducer.transform(doc_emb.reshape(1, -1))[0]
+                        
+                        embeddings.append(doc_emb.tolist())
+                        
+                        # Cleanup
+                        del inputs, outputs, last_hidden
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                except Exception as e:
+                    logger.error(f"Error embedding document: {e}")
+                    # Fallback to zero embedding
+                    dim = 768
+                    embeddings.append([0.0] * dim)
         
         # Set dimension based on first embedding
         if embeddings and self.dim is None:
@@ -92,27 +148,71 @@ class RealTimeEmbeddingFunction:
         """Create LLM embedding for a single query."""
         import torch
         
-        self.model.eval()
-        with torch.no_grad():
-            inputs = self.tokenizer(
-                query, return_tensors="pt", truncation=True,
-                max_length=128, padding=True
-            ).to(self.model.device)
-            
-            outputs = self.model(**inputs, output_hidden_states=True)
-            last_hidden = outputs.hidden_states[-1]
-            query_emb = last_hidden.mean(dim=1).cpu().numpy()[0]
-            
-            # Apply dimensionality reduction if available
-            if self.reducer is not None:
-                query_emb = self.reducer.transform(query_emb.reshape(1, -1))[0]
-            
-            # Cleanup
-            del inputs, outputs, last_hidden
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+        # Check if this is a vLLM backend
+        is_vllm = hasattr(self.model, '__class__') and 'LLM' in str(self.model.__class__)
         
-        return query_emb.tolist()
+        if is_vllm:
+            # For vLLM backend, use encode method
+            try:
+                from vllm import PoolingParams
+                pooling_params = PoolingParams()
+                
+                outputs = self.model.encode([query], pooling_params=pooling_params, use_tqdm=False)
+                
+                if outputs and len(outputs) > 0:
+                    output = outputs[0]
+                    if hasattr(output, 'outputs') and hasattr(output.outputs, 'data'):
+                        embedding_data = output.outputs.data
+                        if hasattr(embedding_data, 'cpu'):
+                            embedding_data = embedding_data.cpu().numpy()
+                        elif isinstance(embedding_data, np.ndarray):
+                            pass
+                        else:
+                            embedding_data = np.array(embedding_data)
+                        
+                        if embedding_data.ndim > 1:
+                            embedding_data = embedding_data.squeeze()
+                        
+                        return embedding_data.tolist()
+                
+                # Fallback
+                logger.error("Failed to extract vLLM query embedding")
+                dim = self.dim or 768
+                return [0.0] * dim
+                
+            except Exception as e:
+                logger.error(f"vLLM query embedding failed: {e}")
+                dim = self.dim or 768
+                return [0.0] * dim
+        
+        try:
+            # Regular PyTorch model
+            if hasattr(self.model, 'eval'):
+                self.model.eval()
+            with torch.no_grad():
+                inputs = self.tokenizer(
+                    query, return_tensors="pt", truncation=True,
+                    max_length=128, padding=True
+                ).to(self.model.device)
+                
+                outputs = self.model(**inputs, output_hidden_states=True)
+                last_hidden = outputs.hidden_states[-1]
+                query_emb = last_hidden.mean(dim=1).cpu().numpy()[0]
+                
+                # Apply dimensionality reduction if available
+                if self.reducer is not None:
+                    query_emb = self.reducer.transform(query_emb.reshape(1, -1))[0]
+                
+                # Cleanup
+                del inputs, outputs, last_hidden
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            
+            return query_emb.tolist()
+        except Exception as e:
+            logger.error(f"Error embedding query: {e}")
+            dim = self.dim or 768
+            return [0.0] * dim
     
     def _embed_documents_tfidf(self, documents):
         """Create TF-IDF embeddings for documents."""
@@ -136,7 +236,8 @@ class RealTimeEmbeddingFunction:
 
 def store_embeddings_in_milvus(lines: List[str], embeddings: np.ndarray, 
                               tokenizer=None, model=None, vectorizer=None, 
-                              reducer=None, embedding_type: str = "llm") -> Tuple[Any, str]:
+                              reducer=None, embedding_type: str = "llm", 
+                              precomputed_embeddings: Optional[np.ndarray] = None) -> Tuple[Any, str]:
     """
     Store embeddings in Milvus vector database for RAG functionality
     

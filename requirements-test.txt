@@ -26,4 +26,5 @@ black>=22.0
 isort>=5.0
 flake8>=4.0
 
-# vllm
+# vLLM for performance comparison testing (optional)
+vllm>=0.6.0
